@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <title>Quiet</title>
+    <link rel="stylesheet" href="http://yui.yahooapis.com/pure/0.6.0/pure-min.css">
+    <style type="text/css" media="all">
+      body {
+        background-color: #ecf0f1;
+      }
+      header {
+        background-color: #2c3e50;
+        padding: 0.5em;
+      }
+      header h1 {
+        margin: 0; padding: 0;
+        font-weight: normal;
+        font-size: 0.8em;
+      }
+      header h1 a {
+        color: white;
+        text-decoration: none;
+      }
+      h2 {
+        font-weight: normal;
+        font-size: 0.75em;
+        color: #7f8c8d;
+        padding: 0 1em;
+      }
+      .app {
+        width: 56em;
+        margin: 2em auto;
+      }
+      .inbox {
+        margin: 0;
+        padding: 0;
+      }
+      .message {
+        list-style: none;
+        background-color: white;
+        padding: 1em;
+        margin: 0 0 1px;
+        transition: all 0.2s;
+      }
+      .message-header {
+        font-size: 0.8em;
+        font-weight: bold;
+        transition: all 0.2s;
+      }
+      .message .message-body {
+        display: none;
+      }
+      .message.is_open {
+        margin: 1em -2em;
+        transition: all 0.2s;
+      }
+      .message.is_read {
+        font-weight: normal;
+      }
+      .message-from, .message-subject {
+        overflow: hidden;
+        white-space: nowrap;
+      }
+      .message.is_open .message-header {
+        padding: 0 0 1em;
+        border-bottom: 1px solid #ecf0f1;
+        transition: all 0.2s;
+      }
+      .message.is_open .message-body {
+        margin: 2em 1em 1em;
+        display: block;
+      }
+      .text-content {
+        white-space: pre;
+      }
+    </style>
+  </head>
+
+  <body ng-app="quiet">
+    <header>
+      <h1><a href="#/">Quiet</a></h1>
+    </header>
+
+    <div class="app" ng-view autoscroll="true"></div>
+
+    <script type="text/ng-template" id="dashboard">
+      <h2>Today</h2>
+      <ul class="inbox">
+        <li class="message"
+            ng-class="{is_read: m.is_read, is_open: m.is_open}"
+            ng-repeat="m in inboxMessages"
+            ng-click="onMessageClick(m.id, $index)">
+          <div class="message-header pure-g">
+            <div class="message-from pure-u-1-5">
+              {{m.from}}  
+            </div>
+            <div class="message-subject pure-u-4-5">
+              {{m.subject}}  
+            </div>
+          </div>
+          <div class="message-body" ng-if="m.body">
+            <div ng-bind-html="m.body"></div>
+          </div>
+        </li>
+      </ul>
+    </script>
+
+    <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.4.6/angular.min.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.4.6/angular-route.min.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.4.6/angular-sanitize.min.js"></script>
+    <script>
+      angular
+        .module('quiet', ['ngRoute', 'ngSanitize'])
+
+        .config(function ($routeProvider) {
+          $routeProvider
+            .when('/', {
+              controller: 'dashboardCtrl',
+              templateUrl: 'dashboard'
+            })
+            .otherwise({
+              redirectTo: '/'
+            });
+        })
+
+        .config(function($sceProvider) {
+          // disable content escaping
+          $sceProvider.enabled(false);
+        })
+
+        .factory('apiClient', function ($http) {
+          return {
+            inboxMessages: function () {
+              return $http.get('/messages/inbox').then(function (response) {
+                return response.data.messages;
+              });
+            },
+
+            messageBody: function (id) {
+              return $http.get('/messages/' + id + '/body').then(function (response) {
+                return response.data.body;
+              });
+            }
+          }
+        })
+
+        .controller('dashboardCtrl', function ($scope, apiClient, $sce) {
+          apiClient.inboxMessages().then(function (messages) {
+            $scope.inboxMessages = messages;
+            $scope.openMessage = null;
+
+            $scope.onMessageClick = function (id, index) {
+              if ($scope.inboxMessages[index].is_open) {
+                $scope.inboxMessages[index].is_open = false;
+                $scope.openMessage = null;
+              } else {
+                apiClient.messageBody(id).then(function (messageBody) {
+                  $scope.inboxMessages[index].body = messageBody;
+                  $sce.trustAsHtml($scope.inboxMessages[index].body)
+                  if ($scope.openMessage !== null) {
+                    $scope.inboxMessages[$scope.openMessage].is_open = false;
+                  }
+                  $scope.inboxMessages[index].is_open = true;
+                  $scope.openMessage = index;
+                });
+              }
+            }
+          });
+        })
+    </script>
+  </body>
+</html>
