@@ -7,26 +7,24 @@ require 'viewpoint'
 
 require 'nokogiri'
 
-class Quiet < Sinatra::Base
+require_relative 'conn'
+
+class QuietApp < Sinatra::Base
   register Sinatra::ConfigFile
 
   set :root, File.join(File.dirname(__FILE__), '..')
   set :public_folder, File.join(root, 'public')
 
-  config_file File.join(root, 'config.yml')
-
   configure :development do
     register Sinatra::Reloader
   end
-
-  exch = Viewpoint::EWSClient.new(settings.endpoint, settings.username, settings.password)
 
   get '/' do
     redirect 'index.html'
   end
 
   get '/messages/inbox' do
-    inbox = exch.get_folder :inbox
+    inbox = Quiet::conn().get_folder :inbox
     messages = inbox.items.map do |m|
       {
         id: m.id,
@@ -39,7 +37,7 @@ class Quiet < Sinatra::Base
   end
 
   get '/messages/:id/body' do
-    message = exch.get_item params['id']
+    message = Quiet::conn().get_item params['id']
     if message.body_type == 'HTML'
       doc = Nokogiri::HTML(message.body)
       json body: doc.at('body').inner_html
